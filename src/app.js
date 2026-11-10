@@ -36,6 +36,32 @@ const NEXT={
  wcu:["Apply for the next start date","https://westcoastuniversity.edu/get-started/application-for-admission"],
  chamberlain:["Start the application and book an interview","https://community.chamberlain.edu/s/application?source=300728"]};
 
+const STATUSES=[["none","Not started","neutral"],["planning","Planning to apply","info"],["applying","Working on it","warn"],["applied","Applied","accent"],["interview","Interview / next round","info"],["accepted","Accepted","good"],["waitlist","Waitlisted","warn"],["denied","Not admitted","bad"]];
+const stOf=id=>{const v=store.get("status")[id];return v&&v.value?v:{value:"none"}};
+const stMeta=v=>STATUSES.find(x=>x[0]===v)||STATUSES[0];
+const stBadge=id=>{const m=stMeta(stOf(id).value);return badge(m[1],m[2])};
+const totalItems=s=>s.courses.length+s.steps.reduce((n,st)=>n+st.checks.length,0);
+const doneItems=s=>Object.values(store.get("ticks-"+s.id)).filter(Boolean).length;
+const bar=(done,total,cls="w-24")=>`<div class="${cls} h-1.5 rounded-full bg-subtle overflow-hidden"><div class="h-full bar-fill rounded-full" style="width:${total?Math.round(done/total*100):0}%"></div></div>`;
+function setStatus(id,value){const all=store.get("status");all[id]={value,at:new Date().toISOString().slice(0,10)};store.set("status",all)}
+
+function tracker(){
+  const tracked=live.filter(s=>stOf(s.id).value!=="none");
+  const count=v=>tracked.filter(s=>stOf(s.id).value===v).length;
+  const chips=[["planning","Planning"],["applying","Working on it"],["applied","Applied"],["interview","Interview"],["accepted","Accepted"]];
+  if(!tracked.length) return `<section class="mt-10"><h2 class="text-sm font-medium text-muted mb-3 flex items-center gap-2">${ic("ListChecks")}My applications</h2>
+    <div class="card p-5 text-sm"><p class="font-medium">Nothing tracked yet</p><p class="mt-1 text-muted">Open any school below and set <span class="text-fg font-medium">My status</span> to “Planning to apply”. It will show up here with her checklist progress and next deadline.</p></div></section>`;
+  return `<section class="mt-10"><h2 class="text-sm font-medium text-muted mb-3 flex items-center gap-2">${ic("ListChecks")}My applications</h2>
+    <div class="card overflow-hidden">
+      <div class="grid grid-cols-3 sm:grid-cols-5 border-b border-border">${chips.map(([v,l],i)=>`<div class="px-4 py-3 ${i?"border-l border-border":""} ${i>=3?"hidden sm:block":""}"><div class="text-2xl font-semibold num ${count(v)?"":"text-muted"}">${count(v)}</div><div class="text-xs text-muted">${l}</div></div>`).join("")}</div>
+      <div class="divide-y divide-border">${tracked.map(s=>{const st=stOf(s.id),d=nextDl(s),t=totalItems(s),dn=doneItems(s);return `<a href="#${s.id}" class="grid grid-cols-[1fr_auto] sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.1fr)] items-center gap-x-4 gap-y-1.5 px-4 py-3 no-underline text-fg hover:bg-subtle">
+        <div class="min-w-0"><div class="font-medium truncate">${esc(s.short)}</div><div class="text-xs text-muted">${st.at?`Updated ${fmt(st.at)}`:""}</div></div>
+        <div class="justify-self-end sm:justify-self-start">${stBadge(s.id)}</div>
+        <div class="flex items-center gap-2 text-sm text-muted">${bar(dn,t)}<span class="num">${dn}/${t}</span></div>
+        <div class="text-sm flex items-center gap-2 min-w-0">${d?`<span class="num">${fmt(d[0])}</span>${countBadge(d[0])}`:`<span class="text-muted">No date posted</span>`}</div></a>`}).join("")}</div>
+    </div></section>`;
+}
+
 const header=()=>`<header class="border-b border-border bg-bg/90 backdrop-blur sticky top-[env(safe-area-inset-top,0px)] z-20">
   <div class="wrap flex h-14 items-center justify-between gap-3">
     <a href="#" class="flex items-center gap-2 font-semibold tracking-tight text-fg no-underline">${ic("GraduationCap","size-5 logo")}<span>Nursing Finder</span></a>
@@ -46,7 +72,7 @@ const header=()=>`<header class="border-b border-border bg-bg/90 backdrop-blur s
 function row(s){
   const d=nextDl(s), f=fit(s);
   return `<a href="#${s.id}" class="row group grid grid-cols-[1fr_auto] md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)_70px_90px_70px_minmax(0,1.3fr)_20px] items-center gap-x-4 gap-y-1 px-4 py-3.5 no-underline text-fg hover:bg-subtle">
-    <div class="min-w-0"><div class="font-medium truncate">${esc(s.name)}</div><div class="text-sm text-muted truncate">${esc(city(s))} · ${esc(kind(s))}</div></div>
+    <div class="min-w-0"><div class="font-medium truncate flex items-center gap-2"><span class="truncate">${esc(s.name)}</span>${stOf(s.id).value!=="none"?`<span class="shrink-0">${stBadge(s.id)}</span>`:""}</div><div class="text-sm text-muted truncate">${esc(city(s))} · ${esc(kind(s))}</div></div>
     <div class="md:order-none justify-self-end md:justify-self-start">${badge(f[0],f[1])}</div>
     <div class="col-span-2 md:col-span-1 flex md:block gap-4 text-sm"><span class="md:hidden text-muted">GPA</span> <span class="num">${esc(s.glance.gpa[0])}</span></div>
     <div class="hidden md:block text-sm truncate">${esc(s.glance.test[0])}</div>
@@ -67,6 +93,8 @@ function home(){
      <p class="mt-3 text-muted text-[17px] leading-relaxed">Every bachelor's nursing program in LA County that takes community college transfers. Open a school to see what to do, in order, with a link for every step.</p>
      <p class="sm:hidden mt-3 text-sm text-muted">Her GPA <span class="num text-fg font-medium">3.9</span> · Science <span class="num text-fg font-medium">4.0</span></p>
    </section>
+
+   ${tracker()}
 
    <section class="mt-10">
      <h2 class="text-sm font-medium text-muted mb-3 flex items-center gap-2">${ic("CalendarDays")}Next deadlines</h2>
@@ -149,7 +177,7 @@ function school(s){
             <div class="flex items-center gap-3 text-sm text-muted"><span id="pc" class="num"></span><div class="w-28 h-1.5 rounded-full bg-subtle overflow-hidden"><div id="pb" class="h-full bar-fill rounded-full transition-all"></div></div></div>
           </div>
           <ol class="mt-5">${steps}</ol>
-          <p class="mt-4 text-xs text-muted">Check marks are saved on this device.</p>
+          <p class="mt-4 text-xs text-muted">Check marks save automatically and show up on any device.</p>
         </section>
 
         <section class="space-y-3">
@@ -160,6 +188,10 @@ function school(s){
       </div>
 
       <aside class="space-y-4 lg:sticky lg:top-20 lg:order-none -order-1 min-w-0">
+        <div class="card p-4"><label for="st" class="text-sm font-medium flex items-center justify-between">My status <span id="stb">${stBadge(s.id)}</span></label>
+          <select id="st" class="input mt-2 px-3">${STATUSES.map(([v,l])=>`<option value="${v}" ${stOf(s.id).value===v?"selected":""}>${l}</option>`).join("")}</select>
+          <div class="mt-3 flex items-center gap-2 text-xs text-muted">${bar(0,1,"flex-1")}<span id="pc2" class="num"></span></div>
+          <p id="stat" class="mt-2 text-xs text-muted">${stOf(s.id).at?`Last updated ${fmt(stOf(s.id).at,1)}`:"Set this so it shows in My applications on the home page."}</p></div>
         ${nx?`<div class="card next-card p-4"><div class="kicker text-xs font-medium flex items-center gap-1.5">${ic("Clock","size-3.5")}Do this next${d?` · by ${fmt(d[0],1)}`:""}</div>
           <p class="mt-1.5 font-medium leading-snug">${esc(nx[0])}</p>
           <a href="${nx[1]}" target="_blank" rel="noopener" class="btn mt-3 w-full">Open ${ic("ArrowUpRight","size-4")}</a></div>`:""}
@@ -173,7 +205,8 @@ function school(s){
     </div>
     <footer class="mt-14 pt-6 border-t border-border text-sm text-muted">Checked ${CHECKED}. Rules change every year, so confirm with ${esc(s.short)} before applying.</footer>
   </main>`;
-  const update=()=>{const t=store.get(key);const done=Object.values(t).filter(Boolean).length;document.getElementById("pc").textContent=`${done} of ${total} done`;document.getElementById("pb").style.width=(total?done/total*100:0)+"%"};
+  const update=()=>{const t=store.get(key);const done=Object.values(t).filter(Boolean).length,w=(total?done/total*100:0)+"%";document.getElementById("pc").textContent=`${done} of ${total} done`;document.getElementById("pb").style.width=w;document.getElementById("pc2").textContent=`${done} of ${total} steps`;document.querySelector("#pc2").previousElementSibling.firstElementChild.style.width=w};
+  document.getElementById("st").onchange=e=>{setStatus(s.id,e.target.value);document.getElementById("stb").innerHTML=stBadge(s.id);document.getElementById("stat").textContent="Saved · last updated "+fmt(stOf(s.id).at,1)};
   update();
   document.querySelectorAll(".cb").forEach(inp=>inp.onchange=()=>{const t=store.get(key);t[inp.id]=inp.checked;store.set(key,t);const lab=inp.nextElementSibling;lab.classList.toggle("line-through",inp.checked);lab.classList.toggle("text-muted",inp.checked);update()});
   document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{const lbl=b.querySelector("span");const ok=()=>{lbl.textContent="Copied";setTimeout(()=>lbl.textContent="Copy",1500)};const sel=()=>{const r=document.createRange();r.selectNodeContents(b.previousElementSibling.lastElementChild);const x=getSelection();x.removeAllRanges();x.addRange(r)};
