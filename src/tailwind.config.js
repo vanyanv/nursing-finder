@@ -1,0 +1,1 @@
+module.exports={content:["./app.js"],safelist:["badge-good","badge-warn","badge-bad","badge-neutral","t-good","t-warn","t-bad","date-tile","good","warn","bad"],theme:{extend:{colors:{bg:"var(--bg)",fg:"var(--fg)",muted:"var(--muted)",border:"var(--border)",subtle:"var(--subtle)",card:"var(--card)",good:"var(--good)",warn:"var(--warn)",bad:"var(--bad)"}}}}
